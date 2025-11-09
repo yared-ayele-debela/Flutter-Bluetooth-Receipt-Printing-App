@@ -45,4 +45,21 @@ class ApiService {
       throw Exception("Failed to load orders (${response.statusCode})");
     }
   }
+
+  Future<OrderModel> getOrderById(int id) async {
+    final url = "$baseUrl/$id";
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      final body = jsonDecode(response.body);
+      if (body is Map<String, dynamic>) {
+        // Some APIs return { data: {...} }
+        final data = body['data'] is Map<String, dynamic> ? body['data'] as Map<String, dynamic> : body as Map<String, dynamic>;
+        return OrderModel.fromJson(data);
+      } else {
+        throw Exception('Unexpected order response type: ${body.runtimeType}');
+      }
+    } else {
+      throw Exception('Failed to load order ($id): ${response.statusCode}');
+    }
+  }
 }

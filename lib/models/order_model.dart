@@ -5,6 +5,7 @@ class OrderModel {
   final double grandTotal;
   final bool isPrinted;
   final String referenceCode;
+  final String counterNumber;
   final String date;
   final List<OrderItem> items;
 
@@ -17,6 +18,7 @@ class OrderModel {
     required this.referenceCode,
     required this.date,
     required this.items,
+    required this.counterNumber,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class OrderModel {
       referenceCode: json['reference_code'] ?? json['reference'] ?? '#${json['id'] ?? 0}',
       date: json['created_at'] ?? json['date'] ?? '',
       items: (json['sale_items'] as List? ?? []).map((i) => OrderItem.fromJson(i)).toList(),
+      counterNumber: json['counter_number'] ?? '',
     );
   }
 }

@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "635601252419",
+    "project_id": "erp-pos-e1242",
+    "storage_bucket": "erp-pos-e1242.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:635601252419:android:b5d4945864a4755cb1e4f6",
+        "android_client_info": {
+          "package_name": "com.example.bluetooth_printer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCk2ZIAhRrs1HbNTMdf-BeKV4YXyNHXpNs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:635601252419:android:89b6ffe34533f699b1e4f6",
+        "android_client_info": {
+          "package_name": "com.example.my_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCk2ZIAhRrs1HbNTMdf-BeKV4YXyNHXpNs"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -59,7 +59,7 @@ class OrderDetailModal extends StatelessWidget {
                     },
                     icon: const Icon(Icons.print),
                     label: const Text("Print"),
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo,foregroundColor: Colors.white),
                   ),
                 ),
               ],
