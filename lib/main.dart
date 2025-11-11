@@ -50,7 +50,7 @@ class _MyAppState extends State<MyApp> {
 
     if (token != null) {
       await http.post(
-        Uri.parse("http://192.168.1.14:8000/api/save-fcm-token"),
+        Uri.parse("http://192.168.1.14:8000/api/update-token"),
         body: {'token': token},
       );
     }
@@ -62,11 +62,31 @@ class _MyAppState extends State<MyApp> {
       // 🔊 Play sound
       await player.play(AssetSource('sounds/notify.mp3'));
 
-      // ✅ In-app heads-up bottom sheet with actions (Print now, View)
+      // ✅ Auto-print on new order
       final orderId = message.data['order_id']?.toString();
-      final context = navigatorKey.currentContext;
-      if (context != null) {
-        _showInAppHeadsUp(context, orderId: orderId, title: message.notification?.title, body: message.notification?.body);
+      final ctx = navigatorKey.currentContext;
+      if (orderId != null) {
+        try {
+          final printer = PrinterService();
+          // Use smart print: saved printer or prompt and save, then print
+          if (ctx != null) {
+            await printer.printOrderByIdSmart(ctx, int.parse(orderId));
+          } else {
+            debugPrint('⚠️ No context available for printer selection.');
+          }
+          return; // done; skip heads-up
+        } catch (e) {
+          debugPrint('⚠️ Auto print failed: $e');
+          if (ctx != null) {
+            _showInAppHeadsUp(ctx, orderId: orderId, title: message.notification?.title, body: message.notification?.body);
+          }
+          return;
+        }
+      }
+
+      // Fallback: show heads-up UI
+      if (ctx != null) {
+        _showInAppHeadsUp(ctx, orderId: orderId, title: message.notification?.title, body: message.notification?.body);
       }
     });
 

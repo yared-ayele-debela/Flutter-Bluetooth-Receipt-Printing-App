@@ -7,6 +7,8 @@ class OrderModel {
   final String referenceCode;
   final String counterNumber;
   final String date;
+    DateTime get dateTime => DateTime.parse(date).toLocal(); // 👈 automatically local
+
   final List<OrderItem> items;
 
   OrderModel({
