@@ -1,10 +1,67 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/order_model.dart';
 
 class ApiService {
   // Change baseUrl to your actual server IP (same subnet as device)
-  final String baseUrl = "http://192.168.1.14:8000/api/orders";
+  final String baseUrl = "https://eam.afroel.com/api/orders";
+
+  static String? _token;
+  static Map<String, dynamic>? _admin;
+
+  // Save token after login
+  Future<void> saveToken(String token) async {
+    _token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('api_token', token);
+  }
+
+  // Save admin data (optional)
+  Future<void> saveAdmin(Map<String, dynamic> admin) async {
+    _admin = admin;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('admin_data', jsonEncode(admin));
+  }
+
+  // Load token on app start
+  Future<void> loadToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    _token = prefs.getString('api_token');
+    final adminJson = prefs.getString('admin_data');
+    if (adminJson != null) {
+      _admin = jsonDecode(adminJson);
+    }
+  }
+
+  // Get current token
+  String? get token => _token;
+
+  // Check if logged in
+  bool get isLoggedIn => _token != null;
+
+  // Add Authorization header automatically
+  Future<Map<String, String>> getHeaders() async {
+    return {
+      'Content-Type': 'application/json',
+      if (_token != null) 'Authorization': 'Bearer $_token',
+    };
+  }
+
+  // Logout
+  Future<void> logout() async {
+    _token = null;
+    _admin = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('api_token');
+    await prefs.remove('admin_data');
+
+    // Call Laravel logout (optional, clears token on server)
+    try {
+      await http.post(Uri.parse('$baseUrl/admin/logout'), headers: await getHeaders());
+    } catch (_) {}
+  }
+
 
   Future<void> markAsPrinted(int orderId) async {
     final url = "$baseUrl/$orderId/mark-printed";

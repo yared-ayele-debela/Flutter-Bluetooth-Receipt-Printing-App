@@ -162,6 +162,34 @@ class PrinterService {
     await prefs.remove(_kPrinterNameKey);
   }
   
+  // Add inside PrinterService class
+Future<bool> autoPrintOrderById(int orderId) async {
+  try {
+    final order = await api.getOrderById(orderId);
+    final address = await getSavedPrinterAddress();
+
+    if (address == null || address.isEmpty) {
+      debugPrint('No saved printer for auto-print');
+      return false;
+    }
+
+    await PermissionHelper.requestBluetoothPermissions();
+    final bytes = _buildReceiptBytes(order);
+
+    await FlutterBluetoothPrinter.printBytes(
+      address: address,
+      data: bytes,
+      keepConnected: false,
+    );
+
+    await api.markAsPrinted(order.id);
+    debugPrint('Auto-printed order #$orderId');
+    return true;
+  } catch (e) {
+    debugPrint('Auto-print failed: $e');
+    return false;
+  }
+}
 }
 
 

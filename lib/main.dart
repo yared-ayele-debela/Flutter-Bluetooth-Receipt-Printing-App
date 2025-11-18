@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:bluetooth_printer/pages/login.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -50,7 +51,7 @@ class _MyAppState extends State<MyApp> {
 
     if (token != null) {
       await http.post(
-        Uri.parse("http://192.168.1.14:8000/api/update-token"),
+        Uri.parse("https://eam.afroel.com/api/update-token"),
         body: {'token': token},
       );
     }
@@ -108,8 +109,42 @@ class _MyAppState extends State<MyApp> {
       navigatorKey: navigatorKey, // ✅ Add this line
       debugShowCheckedModeBanner: false,
       theme: ThemeData(primarySwatch: Colors.indigo),
-      home: const SalesDashboard(),
+      home: const AuthWrapper(),
     );
+  }
+}
+
+// Add this in main.dart or separate file
+class AuthWrapper extends StatefulWidget {
+  const AuthWrapper({Key? key}) : super(key: key);
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  bool _isChecking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    await ApiService().loadToken();
+    setState(() => _isChecking = false);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isChecking) {
+      return Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    return ApiService().isLoggedIn
+        ? const SalesDashboard()
+        : const LoginPage();
   }
 }
 

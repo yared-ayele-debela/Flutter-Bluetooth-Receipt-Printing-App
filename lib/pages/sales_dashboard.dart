@@ -7,6 +7,8 @@ import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer.dart';
 import 'dart:typed_data';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'login.dart';
+
 class SalesDashboard extends StatefulWidget {
   const SalesDashboard({super.key});
 
@@ -167,6 +169,7 @@ class _SalesDashboardState extends State<SalesDashboard>
                       onPressed: _refreshAll,
                     ),
 
+
                     // Bluetooth Icon + Tooltip + Long-press Disconnect
                     FutureBuilder<Map<String, String?>>(
                       future: Future.wait([
@@ -193,6 +196,58 @@ class _SalesDashboardState extends State<SalesDashboard>
                           onLongPress: isConnected
                               ? () => _onBluetoothLongPress(context)
                               : null,
+                        );
+                      },
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.logout),
+                      tooltip: 'Logout',
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (BuildContext dialogContext) {
+                            return AlertDialog(
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              title: const Row(
+                                children: [
+                                  Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                                  SizedBox(width: 12),
+                                  Text('Confirm Logout'),
+                                ],
+                              ),
+                              content: const Text('Are you sure you want to log out?\nYou will need to login again to continue.'),
+                              actions: [
+                                // Cancel Button
+                                TextButton(
+                                  onPressed: () => Navigator.of(dialogContext).pop(),
+                                  child: const Text('Cancel'),
+                                ),
+                                // Confirm Logout Button
+                                ElevatedButton(
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red.shade600),
+                                  onPressed: () async {
+                                    Navigator.of(context).pop(); // Close the dialog first
+
+                                    // Optional: show a quick snackbar
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(content: Text('Logging out...'), duration: Duration(seconds: 1)),
+                                    );
+                                    // Clear token locally + call backend logout
+                                    await ApiService().logout();
+                                    // Go back to login screen (user can't press back to return)
+                                    if (!context.mounted) return; // Safety check (Flutter 3.7+)
+
+                                    Navigator.of(context).pushReplacement(
+                                      MaterialPageRoute(builder: (_) => const LoginPage()),
+                                    );
+                                  },
+                                  child: const Text('Yes, Logout', style: TextStyle(color: Colors.white)),
+                                )
+                              ],
+                            );
+                          },
                         );
                       },
                     ),
