@@ -6,6 +6,7 @@ class OrderModel {
   final bool isPrinted;
   final String referenceCode;
   final String counterNumber;
+  final String tableNumber;
   final String date;
     DateTime get dateTime => DateTime.parse(date).toLocal(); // 👈 automatically local
 
@@ -21,6 +22,7 @@ class OrderModel {
     required this.date,
     required this.items,
     required this.counterNumber,
+    required this.tableNumber,
   });
 
   factory OrderModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class OrderModel {
       date: json['created_at'] ?? json['date'] ?? '',
       items: (json['sale_items'] as List? ?? []).map((i) => OrderItem.fromJson(i)).toList(),
       counterNumber: json['counter_number'] ?? '',
+      tableNumber:  json['table_number'] ?? '',
     );
   }
 }

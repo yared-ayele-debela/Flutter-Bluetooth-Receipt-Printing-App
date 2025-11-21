@@ -1,3 +1,4 @@
+// lib/widgets/orders_tab.dart
 import 'package:flutter/material.dart';
 import '../models/order_model.dart';
 import '../services/api_service.dart';
@@ -9,85 +10,140 @@ class OrdersTab extends StatefulWidget {
   const OrdersTab({super.key, required this.type});
 
   @override
-  _OrdersTabState createState() => _OrdersTabState();
+  State<OrdersTab> createState() => _OrdersTabState();
 }
 
 class _OrdersTabState extends State<OrdersTab> {
-  final ApiService apiService = ApiService();
-  late Future<List<OrderModel>> ordersFuture;
+  final ApiService _api = ApiService();
+  final ScrollController _scrollController = ScrollController();
+
+  List<OrderModel> _orders = [];
+  int _currentPage = 1;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
 
   @override
   void initState() {
     super.initState();
-    ordersFuture = apiService.getOrdersByType(widget.type);
+    _loadOrders(page: 1);
+
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >=
+          _scrollController.position.maxScrollExtent * 0.95 &&
+          !_isLoadingMore &&
+          _hasMore) {
+        _loadMore();
+      }
+    });
   }
 
-  Future<void> refresh() async {
-    setState(() {
-      ordersFuture = apiService.getOrdersByType(widget.type);
-    });
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadOrders({int page = 1}) async {
+    if (page == 1) {
+      setState(() {
+        _orders.clear();
+        _currentPage = 1;
+        _hasMore = true;
+      });
+    }
+
+    try {
+      final newOrders = await _api.getOrdersByType(
+        widget.type,
+        page: page,
+      );
+      setState(() {
+        if (page == 1) {
+          _orders = newOrders;
+        } else {
+          _orders.addAll(newOrders);
+        }
+        _currentPage = page;
+        _hasMore = newOrders.length == 10; // Adjust based on your per_page (default Laravel = 15 or 20)
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading orders: $e')),
+        );
+      }
+      setState(() => _isLoadingMore = false);
+    }
+  }
+
+  Future<void> _loadMore() async {
+    if (_isLoadingMore || !_hasMore) return;
+    setState(() => _isLoadingMore = true);
+    await _loadOrders(page: _currentPage + 1);
+  }
+
+  Future<void> _refresh() async {
+    await _loadOrders(page: 1);
   }
 
   void _showOrderDetailsDialog(OrderModel order) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (context) {
-        return OrderDetailModal(
-          order: order,
-          onPrinted: () async {
-            await refresh();
-          },
-        );
-      },
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => OrderDetailModal(
+        order: order,
+        onPrinted: _refresh,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<List<OrderModel>>(
-      future: ordersFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        } else if (snapshot.hasError) {
-          return Center(child: Text("Error: ${snapshot.error}"));
-        } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Text("No orders available"),
-                const SizedBox(height: 12),
-                ElevatedButton.icon(
-                  onPressed: refresh,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text("Retry"),
-                ),
-              ],
+    if (_orders.isEmpty && _currentPage == 1 && !_isLoadingMore) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text("No orders available"),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+              onPressed: _refresh,
+              icon: const Icon(Icons.refresh),
+              label: const Text("Refresh"),
             ),
-          );
-        }
+          ],
+        ),
+      );
+    }
 
-        final orderList = snapshot.data!;
-        return RefreshIndicator(
-          onRefresh: refresh,
-          child: ListView.builder(
-            itemCount: orderList.length,
-            itemBuilder: (context, index) {
-              final order = orderList[index];
-              return OrderCard(
-                order: order,
-                onViewDetails: () => _showOrderDetailsDialog(order),
-                onPrint: () {
-                  // optional quick print action (we recommend using details modal)
-                },
-              );
-            },
-          ),
-        );
-      },
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: ListView.builder(
+        controller: _scrollController,
+        padding: const EdgeInsets.fromLTRB(8, 94, 8, 8), // 👈 Added top padding
+        // padding: const EdgeInsets.all(8),
+        itemCount: _orders.length + (_hasMore ? 1 : 0),
+        itemBuilder: (context, index) {
+          // Loading indicator at bottom
+          if (index == _orders.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
+
+          final order = _orders[index];
+          return OrderCard(
+            order: order,
+            onViewDetails: () => _showOrderDetailsDialog(order),
+            onPrint: () {},
+          );
+        },
+      ),
     );
   }
 }

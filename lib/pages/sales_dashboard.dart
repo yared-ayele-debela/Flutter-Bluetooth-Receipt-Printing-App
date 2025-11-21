@@ -1,3 +1,4 @@
+import 'package:bluetooth_printer/pages/store_selection_page.dart';
 import 'package:flutter/material.dart';
 import '../widgets/orders_tab.dart';
 import '../services/api_service.dart';
@@ -66,6 +67,81 @@ class _SalesDashboardState extends State<SalesDashboard>
     );
   }
 
+  void _showChangeStoreDialog() {
+    showDialog(
+      context: context, // ← This is the correct context from StatefulWidget
+      builder: (dialogContext) => AlertDialog( // ← Use different name here
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Row(
+          children: [
+            Icon(Icons.storefront_outlined, color: Colors.indigo),
+            SizedBox(width: 12),
+            Text('Change Store'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Current store:'),
+            const SizedBox(height: 12),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.indigo.shade50,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.store, color: Colors.indigo.shade700),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          ApiService.currentStoreName ?? 'Not selected',
+                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                        ),
+                        Text(
+                          'ID: ${ApiService.currentStoreId ?? '-'}',
+                          style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text('Do you want to switch to another store?'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.indigo),
+            onPressed: () {
+              Navigator.pop(dialogContext); // Close dialog first
+
+              // Clear current store
+              ApiService().clearCurrentStore();
+
+              // ←←← NOW USE THE CORRECT CONTEXT (from dashboard) ←←←
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const StoreSelectionPage()),
+                    (route) => false,
+              );
+            },
+            child: const Text('Change Store', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
   // Open full Bluetooth device list
   Future<void> _openBluetoothDeviceList(BuildContext context) async {
     try {
@@ -113,37 +189,90 @@ class _SalesDashboardState extends State<SalesDashboard>
   Widget _buildTabView(String type) => OrdersTab(type: type);
 
   Future<_DashboardStats> _loadStats() async {
-    final results = await Future.wait<List<OrderModel>>([
-      _api.getOrdersByType('all'),
-      _api.getOrdersByType('new'),
-      _api.getOrdersByType('printed'),
-      _api.getOrdersByType('pos'),
-      _api.getOrdersByType('waiter'),
-    ]);
+    try {
+      // This will throw StoreNotSelectedException or 401 if needed
+      final results = await Future.wait<List<OrderModel>>(
+        [
+          _api.getOrdersByType('all'),
+          _api.getOrdersByType('new'),
+          _api.getOrdersByType('printed'),
+          _api.getOrdersByType('pos'),
+          _api.getOrdersByType('waiter'),
+        ],
+        eagerError: true, // ← Stops immediately on first error (critical!)
+      );
 
-    final all = results[0];
-    final newly = results[1];
-    final printed = results[2];
-    final pos = results[3];
-    final waiter = results[4];
+      final all = results[0];
+      final newly = results[1];
+      final printed = results[2];
+      final pos = results[3];
+      final waiter = results[4];
 
-    final totalSales = all.fold<double>(0, (p, e) => p + e.grandTotal);
-    final today = DateTime.now();
-    final todaySales = all.where((o) {
-      final d = o.dateTime;
-      if (d == null) return false;
-      return d.year == today.year && d.month == today.month && d.day == today.day;
-    }).fold<double>(0, (p, e) => p + e.grandTotal);
+      final totalSales = all.fold<double>(0, (sum, order) => sum + (order.grandTotal ?? 0));
 
-    return _DashboardStats(
-      totalOrders: all.length,
-      totalSales: totalSales,
-      todaySales: todaySales,
-      newCount: newly.length,
-      printedCount: printed.length,
-      posCount: pos.length,
-      waiterCount: waiter.length,
-    );
+      final today = DateTime.now();
+      final todaySales = all.where((order) {
+        final date = order.dateTime;
+        return date != null &&
+            date.year == today.year &&
+            date.month == today.month &&
+            date.day == today.day;
+      }).fold<double>(0, (sum, order) => sum + (order.grandTotal ?? 0));
+
+      return _DashboardStats(
+        totalOrders: all.length,
+        totalSales: totalSales,
+        todaySales: todaySales,
+        newCount: newly.length,
+        printedCount: printed.length,
+        posCount: pos.length,
+        waiterCount: waiter.length,
+      );
+    } on StoreNotSelectedException {
+      // Auto redirect to store selection
+      if (mounted) {
+        ApiService().clearCurrentStore();
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const StoreSelectionPage()),
+              (route) => false,
+        );
+      }
+      // Return empty stats so UI doesn't crash
+      return _DashboardStats(
+        totalOrders: 0,
+        totalSales: 0,
+        todaySales: 0,
+        newCount: 0,
+        printedCount: 0,
+        posCount: 0,
+        waiterCount: 0,
+      );
+    } on Exception catch (e) {
+      if (e.toString().contains('Session expired') || e.toString().contains('401')) {
+        if (mounted) {
+          _showTopSnackBar('Session expired. Logging out...', isError: true);
+          await ApiService().logout();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(builder: (_) => const LoginPage()),
+                (route) => false,
+          );
+        }
+      } else {
+        // Other network errors
+        _showTopSnackBar('Failed to load data. Pull to refresh.', isError: true);
+      }
+
+      // Return previous stats or zero
+      return _DashboardStats(
+        totalOrders: 0,
+        totalSales: 0,
+        todaySales: 0,
+        newCount: 0,
+        printedCount: 0,
+        posCount: 0,
+        waiterCount: 0,
+      );
+    }
   }
 
   @override
@@ -169,6 +298,11 @@ class _SalesDashboardState extends State<SalesDashboard>
                       onPressed: _refreshAll,
                     ),
 
+                    IconButton(
+                      icon: const Icon(Icons.swap_horiz),
+                      tooltip: 'Change Store',
+                      onPressed: _showChangeStoreDialog,
+                    ),
 
                     // Bluetooth Icon + Tooltip + Long-press Disconnect
                     FutureBuilder<Map<String, String?>>(
@@ -308,6 +442,7 @@ class _SalesDashboardState extends State<SalesDashboard>
   }
 }
 
+
 // ======================
 // _DashboardStats & _StatsHeader (unchanged)
 // ======================
@@ -331,6 +466,7 @@ class _DashboardStats {
     required this.waiterCount,
   });
 }
+
 
 class _StatsHeader extends StatelessWidget {
   final AsyncSnapshot<_DashboardStats> snapshot;

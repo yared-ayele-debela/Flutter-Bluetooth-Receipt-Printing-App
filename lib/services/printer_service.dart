@@ -56,17 +56,28 @@ class PrinterService {
   final DateFormat df = DateFormat('yyyy-MM-dd HH:mm');
   final List<String> lines = [];
 
+  DateTime parsedDate;
+  try {
+    parsedDate = DateTime.parse(order.date);
+  } catch (_) {
+    parsedDate = DateTime.now();
+  }
+  final formattedDate = DateFormat('yyyy-MM-dd').format(parsedDate);
+  final formattedTime = DateFormat('hh:mm a').format(parsedDate);
+
+
   // 🟩 Add top blank space (3 empty lines)
   lines.add('\n\n\n');
-
   // Header
-  lines.add('      COUNTER: ${order.counterNumber}');
-  lines.add('      DATE: ${order.date.isNotEmpty ? order.date : df.format(DateTime.now())}');
+  lines.add('        COUNTER: ${order.counterNumber}');
+  lines.add('Date: $formattedDate     Time: $formattedTime');
   lines.add('--------------------------------');
   lines.add('Ref: ${order.referenceCode}');
-  lines.add('Order: #${order.id}');
+  // lines.add('Order: #${order.id}');
   lines.add('Customer: ${order.customerName}');
-  lines.add('Waiter: ${order.waiterName ?? "-"}');
+  // lines.add('Waiter: ${order.waiterName ?? "-"}');
+  lines.add('Waiter Name: ${order.waiterName ?? "-"}');
+  lines.add('Table No.: ${order.tableNumber}     Order No.: ${order.id}');
   lines.add('--------------------------------');
   lines.add('Item                 QTY   Total');
   lines.add('--------------------------------');

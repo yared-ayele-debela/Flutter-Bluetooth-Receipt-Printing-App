@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:bluetooth_printer/pages/login.dart';
+import 'package:bluetooth_printer/pages/store_selection_page.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -41,63 +42,55 @@ class _MyAppState extends State<MyApp> {
 
   Future<void> _initFirebaseMessaging() async {
     final fcm = FirebaseMessaging.instance;
-
-    // ✅ Ask permission
+    // Ask permission
     await fcm.requestPermission();
-
-    // ✅ Get token and send to Laravel
+    // Get FCM token
     final token = await fcm.getToken();
-    debugPrint("🔑 FCM Token: $token");
-
+    debugPrint("FCM Token: $token");
     if (token != null) {
-      await http.post(
-        Uri.parse("https://eam.afroel.com/api/update-token"),
-        body: {'token': token},
-      );
-    }
-
-    // ✅ Foreground message handler
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
-      debugPrint("💬 Foreground message: ${message.notification?.title}");
-
-      // 🔊 Play sound
-      await player.play(AssetSource('sounds/notify.mp3'));
-
-      // ✅ Auto-print on new order
-      final orderId = message.data['order_id']?.toString();
-      final ctx = navigatorKey.currentContext;
-      if (orderId != null) {
+      final api = ApiService();
+      await api.loadToken(); // Make sure token & admin data is loaded
+      if (api.isLoggedIn && ApiService.adminId != null) {
         try {
-          final printer = PrinterService();
-          // Use smart print: saved printer or prompt and save, then print
-          if (ctx != null) {
-            await printer.printOrderByIdSmart(ctx, int.parse(orderId));
-          } else {
-            debugPrint('⚠️ No context available for printer selection.');
-          }
-          return; // done; skip heads-up
+          await http.post(
+            Uri.parse('https://eam.afroel.com/api/admin/update-fcm-token'),
+            headers: await api.getHeaders(), // Sends Bearer token
+            body: jsonEncode({
+              'fcm_token': token,
+            }),
+          );
+          debugPrint("FCM token sent successfully for admin ${ApiService.adminId}");
         } catch (e) {
-          debugPrint('⚠️ Auto print failed: $e');
-          if (ctx != null) {
-            _showInAppHeadsUp(ctx, orderId: orderId, title: message.notification?.title, body: message.notification?.body);
-          }
-          return;
+          debugPrint("Failed to send FCM token: $e");
         }
       }
+    }
 
-      // Fallback: show heads-up UI
-      if (ctx != null) {
-        _showInAppHeadsUp(ctx, orderId: orderId, title: message.notification?.title, body: message.notification?.body);
+    // Foreground handler (unchanged – keep your sound + print)
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) async {
+      debugPrint("Foreground message: ${message.notification?.title}");
+      await player.play(AssetSource('sounds/notify.mp3'));
+
+      final orderId = message.data['order_id']?.toString();
+      final ctx = navigatorKey.currentContext;
+      if (orderId != null && ctx != null) {
+        try {
+          final printer = PrinterService();
+          await printer.printOrderByIdSmart(ctx, int.parse(orderId));
+        } catch (e) {
+          _showInAppHeadsUp(ctx, orderId: orderId, title: message.notification?.title, body: message.notification?.body);
+        }
+      } else if (ctx != null) {
+        _showInAppHeadsUp(ctx, title: message.notification?.title, body: message.notification?.body);
       }
     });
 
-    // When user taps system notification to open the app
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) async {
+    // Background tap
+    FirebaseMessaging.onMessageOpenedApp.listen((message) {
       final orderId = message.data['order_id']?.toString();
-      // Optionally navigate or show quick view when app is resumed
       final ctx = navigatorKey.currentContext;
-      if (ctx != null && orderId != null) {
-        _showInAppHeadsUp(ctx, orderId: orderId, title: message.notification?.title, body: message.notification?.body);
+      if (orderId != null && ctx != null) {
+        _showInAppHeadsUp(ctx, orderId: orderId);
       }
     });
   }
@@ -142,9 +135,18 @@ class _AuthWrapperState extends State<AuthWrapper> {
       return Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return ApiService().isLoggedIn
-        ? const SalesDashboard()
-        : const LoginPage();
+    final api = ApiService();
+
+    if (!api.isLoggedIn) {
+      return const LoginPage();
+    }
+
+    // ←←← If logged in but no store selected → go to store selection
+    if (ApiService.currentStoreId == null) {
+      return const StoreSelectionPage();
+    }
+
+    return const SalesDashboard();
   }
 }
 

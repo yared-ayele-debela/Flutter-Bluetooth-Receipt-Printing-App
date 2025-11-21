@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/order_model.dart';
+import 'package:intl/intl.dart';     // 👈 ADD THIS
+
 
 class OrderCard extends StatelessWidget {
   final OrderModel order;
@@ -15,20 +17,31 @@ class OrderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    DateTime parsedDate;
+    try {
+      parsedDate = DateTime.parse(order.date);
+    } catch (_) {
+      parsedDate = DateTime.now();
+    }
+
+    final formattedDate = DateFormat('yyyy-MM-dd').format(parsedDate);
+    final formattedTime = DateFormat('hh:mm a').format(parsedDate);
+
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       elevation: 4,
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
         title: Text(
-          "Order #${order.id} • ${order.customerName}",
+          "Order #${order.id} • ${order.waiterName ?? "-"}",
           style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
         ),
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
-            "Total: ${order.grandTotal.toStringAsFixed(2)} ETB\nDate: ${order.date}",
+            "Total: ${order.grandTotal.toStringAsFixed(2)} ETB\n"
+                "Date: $formattedDate • $formattedTime",
             style: TextStyle(color: Colors.grey[700]),
           ),
         ),
